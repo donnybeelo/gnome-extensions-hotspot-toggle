@@ -1,0 +1,10 @@
+{
+    "uuid": "hotspot-toggle@donnybeelo.github.com",
+    "name": "Hotspot Toggle",
+    "description": "A GNOME Shell extension to toggle mobile hotspot on an Android device over Bluetooth.",
+    "shell-version": [ "45", "46", "47", "48" ],
+    "version": 1,
+    "url": "",
+    "gettext-domain": "hotspot-toggle",
+    "settings-schema": "org.gnome.shell.extensions.hotspot-toggle"
+}

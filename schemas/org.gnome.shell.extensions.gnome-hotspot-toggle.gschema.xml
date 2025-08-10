@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.hotspot-toggle" path="/org/gnome/shell/extensions/hotspot-toggle/">
+    <key name="bluetooth-address" type="s">
+      <default>""</default>
+      <summary>Bluetooth MAC Address</summary>
+      <description>The MAC address of the Bluetooth device to connect to.</description>
+    </key>
+    <key name="wifi-ssid" type="s">
+      <default>""</default>
+      <summary>Wi-Fi SSID</summary>
+      <description>The SSID of the Wi-Fi network to connect to when toggling the hotspot.</description>
+    </key>
+  </schema>
+</schemalist>
