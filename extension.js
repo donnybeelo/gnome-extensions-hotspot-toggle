@@ -8,6 +8,11 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 
+// Keep a module-level reference so repeated enable() calls (which can
+// happen spuriously after resume or shell mode switches) don't stack
+// duplicate indicators/toggles.
+let _singletonIndicator = null;
+
 
 const HotspotToggle = GObject.registerClass(
     class HotspotToggle extends QuickSettings.SystemIndicator {
@@ -253,14 +258,41 @@ export default class HotspotExtension extends Extension {
         // Get the settings for this extension
         this._settings = this.getSettings('org.gnome.shell.extensions.gnome-hotspot-toggle');
 
+        // Defensive: if an instance already exists (e.g., GNOME Shell
+        // re-ran enable without disable during a suspend/resume edge case),
+        // destroy it first to avoid duplicate toggles.
+        if (_singletonIndicator && !_singletonIndicator._destroyed) {
+            try {
+                // Also explicitly destroy child quick setting items.
+                _singletonIndicator.quickSettingsItems?.forEach(i => {
+                    if (!i._destroyed) i.destroy();
+                });
+                _singletonIndicator.destroy();
+            } catch (e) {
+                // ignore
+            }
+            _singletonIndicator = null;
+        }
+
         // Create the toggle and pass the settings to it
         this._indicator = new HotspotToggle(this._settings);
+        _singletonIndicator = this._indicator;
         Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
     }
 
     disable() {
-        this._indicator.destroy();
+        if (this._indicator) {
+            try {
+                this._indicator.quickSettingsItems?.forEach(i => {
+                    if (!i._destroyed) i.destroy();
+                });
+                this._indicator.destroy();
+            } catch (e) {
+                // ignore
+            }
+        }
         this._indicator = null;
         this._settings = null;
+        _singletonIndicator = null;
     }
 }
