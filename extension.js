@@ -8,22 +8,17 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 
-// Keep a module-level reference so repeated enable() calls (which can
-// happen spuriously after resume or shell mode switches) don't stack
-// duplicate indicators/toggles.
-let _singletonIndicator = null;
-
-
 const HotspotToggle = GObject.registerClass(
     class HotspotToggle extends QuickSettings.SystemIndicator {
-        _init(settings) {
-            super._init();
+        constructor(settings) {
+            super();
 
             this._settings = settings;
 
             this._indicator = this._addIndicator();
             this._indicator.visible = false;
             this._indicator.icon_name = 'network-wireless-hotspot-symbolic';
+            this._timerid = 0;
 
             const toggle = new QuickSettings.QuickToggle({
                 title: _('Phone Hotspot'),
@@ -33,19 +28,47 @@ const HotspotToggle = GObject.registerClass(
             toggle.connect('clicked', this._toggleHotspot.bind(this));
             this.quickSettingsItems.push(toggle);
 
-            this._setIndicatorVisibility();
+            this._setIndicatorVisibility()
         }
 
         _showNotification(message) {
             Main.notify('Phone Hotspot', message);
         }
 
-        _setIndicatorVisibility() {
+        async _run(command) {
+            // Minimal wrapper around Gio.Subprocess returning { success, stdout, stderr }
+            return await new Promise((resolve, reject) => {
+                let proc;
+                try {
+                    proc = Gio.Subprocess.new(command, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+                } catch (e) { reject(e); return; }
+                proc.communicate_utf8_async(null, null, (p, res) => {
+                    try {
+                        const [, stdout, stderr] = p.communicate_utf8_finish(res);
+                        resolve({ success: p.get_successful(), stdout: stdout || '', stderr: stderr || '' });
+                    } catch (e) { reject(e); }
+                });
+            });
+        }
+
+        _wait(seconds) {
+            if (this._timerid) {
+                GLib.Source.remove(this._timerid);
+            }
+            return new Promise(r => {
+                this._timerid = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
+                    this._timerid = 0;
+                    r();
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
+        }
+
+        async _setIndicatorVisibility() {
             const ssid = this._settings.get_string('wifi-ssid');
-            const [, stdout, ,] = GLib.spawn_command_line_sync(
-                `nmcli -t -f active,ssid dev wifi`
-            );
-            const connections = stdout ? stdout.toString().split('\n') : [];
+            await this._run(['nmcli', 'device', 'wifi', 'rescan']);
+            const { stdout } = await this._run(['nmcli', '-t', '-f', 'active,ssid', 'dev', 'wifi']);
+            const connections = stdout ? stdout.split('\n') : [];
             let found = false;
             let connect = false;
             for (const line of connections) {
@@ -61,7 +84,7 @@ const HotspotToggle = GObject.registerClass(
                 this.quickSettingsItems[0].checked = true;
                 this._indicator.visible = true;
                 if (connect) {
-                    GLib.spawn_command_line_async(`nmcli device wifi connect "${ssid}"`);
+                    await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
                     this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
                 }
             } else {
@@ -97,22 +120,41 @@ const HotspotToggle = GObject.registerClass(
         async _findBluezDevicePath(btAddress) {
             // BlueZ device object paths are like /org/bluez/hci0/dev_XX_XX_XX_XX_XX_XX
             const formatted = btAddress.replace(/:/g, '_');
-            const manager = await Gio.DBusProxy.new_for_bus_sync(
-                Gio.BusType.SYSTEM,
-                Gio.DBusProxyFlags.NONE,
-                null,
-                'org.bluez',
-                '/',
-                'org.freedesktop.DBus.ObjectManager',
-                null
-            );
-            const objects = manager.call_sync(
-                'GetManagedObjects',
-                null,
-                Gio.DBusCallFlags.NONE,
-                -1,
-                null
-            ).deep_unpack()[0];
+            const manager = await new Promise((resolve, reject) => {
+                Gio.DBusProxy.new_for_bus(
+                    Gio.BusType.SYSTEM,
+                    Gio.DBusProxyFlags.NONE,
+                    null,
+                    'org.bluez',
+                    '/',
+                    'org.freedesktop.DBus.ObjectManager',
+                    null,
+                    (src, res) => {
+                        try {
+                            resolve(Gio.DBusProxy.new_for_bus_finish(res));
+                        } catch (e) {
+                            reject(e);
+                        }
+                    }
+                );
+            });
+            const [objects] = await new Promise((resolve, reject) => {
+                manager.call(
+                    'GetManagedObjects',
+                    null,
+                    Gio.DBusCallFlags.NONE,
+                    -1,
+                    null,
+                    (proxy, res) => {
+                        try {
+                            resolve(proxy.call_finish(res).deep_unpack());
+                        } catch (e) {
+                            reject(e);
+                        }
+                    }
+                );
+            });
+
             for (let [path, interfaces] of Object.entries(objects)) {
                 if (interfaces['org.bluez.Device1'] && path.endsWith(`dev_${formatted}`)) {
                     return path;
@@ -122,128 +164,86 @@ const HotspotToggle = GObject.registerClass(
         }
 
         async _bluezConnectThenDisconnectDevice(devicePath) {
-            const device = await Gio.DBusProxy.new_for_bus_sync(
-                Gio.BusType.SYSTEM,
-                Gio.DBusProxyFlags.NONE,
-                null,
-                'org.bluez',
-                devicePath,
-                'org.bluez.Device1',
-                null
-            );
-            const connected = device.get_cached_property('Connected')?.unpack();
+            const device = await new Promise((resolve, reject) => {
+                Gio.DBusProxy.new_for_bus(
+                    Gio.BusType.SYSTEM,
+                    Gio.DBusProxyFlags.NONE,
+                    null,
+                    'org.bluez',
+                    devicePath,
+                    'org.bluez.Device1',
+                    null,
+                    (src, res) => {
+                        try {
+                            resolve(Gio.DBusProxy.new_for_bus_finish(res));
+                        } catch (e) {
+                            reject(e);
+                        }
+                    }
+                );
+            });
 
+            const call = method => new Promise((resolve, reject) => {
+                device.call(
+                    method,
+                    null,
+                    Gio.DBusCallFlags.NONE,
+                    -1,
+                    null,
+                    (proxy, res) => {
+                        try {
+                            proxy.call_finish(res);
+                            resolve();
+                        } catch (e) {
+                            reject(e);
+                        }
+                    }
+                );
+            });
+            const connected = device.get_cached_property('Connected')?.unpack();
             if (connected) {
-                // If already connected, disconnect first, then connect
-                await new Promise((resolve, reject) => {
-                    device.call(
-                        'Disconnect',
-                        null,
-                        Gio.DBusCallFlags.NONE,
-                        -1,
-                        null,
-                        (proxy, res) => {
-                            try {
-                                proxy.call_finish(res);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    );
-                });
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await new Promise((resolve, reject) => {
-                    device.call(
-                        'Connect',
-                        null,
-                        Gio.DBusCallFlags.NONE,
-                        -1,
-                        null,
-                        (proxy, res) => {
-                            try {
-                                proxy.call_finish(res);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    );
-                });
+                await call('Disconnect');
+                await this._wait(2); // Wait for disconnect to complete
+                await call('Connect');
             } else {
-                // If not connected, connect first, then disconnect
-                await new Promise((resolve, reject) => {
-                    device.call(
-                        'Connect',
-                        null,
-                        Gio.DBusCallFlags.NONE,
-                        -1,
-                        null,
-                        (proxy, res) => {
-                            try {
-                                proxy.call_finish(res);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    );
-                });
-                await new Promise((resolve, reject) => {
-                    device.call(
-                        'Disconnect',
-                        null,
-                        Gio.DBusCallFlags.NONE,
-                        -1,
-                        null,
-                        (proxy, res) => {
-                            try {
-                                proxy.call_finish(res);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    );
-                });
+                await call('Connect');
+                await call('Disconnect');
             }
         }
 
         async _handleWiFi() {
             const ssid = this._settings.get_string('wifi-ssid');
             if (this.quickSettingsItems[0].checked) {
-                let connected = false;
-                let count = 0;
-                while (!connected && count < 5) {
-                    GLib.spawn_command_line_sync(`nmcli device wifi rescan`)
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    const [, , , status] = GLib.spawn_command_line_sync(
-                        `nmcli device wifi connect "${ssid}"`
-                    );
-                    connected = status === 0;
-                    count++;
+                let attempt = 0, connected = false;
+                while (!connected && attempt++ < 5) {
+                    await this._run(['nmcli', 'device', 'wifi', 'rescan'])
+                    const result = await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
+                    connected = !!result?.success;
+                    if (!connected) await this._wait(2);
                 }
-                if (connected) {
+                if (connected)
                     this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
-                }
-                else {
+                else
                     this._showNotification(_('Failed to connect to Wi-Fi network: ') + ssid);
-                }
             } else {
-                const [, , stderr, status] = GLib.spawn_command_line_sync(
-                    `nmcli device disconnect wlo1`
-                );
-                if (status !== 0) {
-                    throw new Error(stderr ? stderr.toString() : _('Failed to disconnect from Wi-Fi.'));
-                }
+                await this._run(['nmcli', 'device', 'disconnect', 'wlo1'])
                 this._showNotification(_('Disconnected from Wi-Fi network: ') + ssid);
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                GLib.spawn_command_line_async(`nmcli device wifi rescan`)
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                GLib.spawn_command_line_async(`nmcli device set wlo1 autoconnect on`)
+                await this._run(['nmcli', 'device', 'wifi', 'rescan'])
+                await this._run(['nmcli', 'device', 'set', 'wlo1', 'autoconnect', 'on'])
             }
         }
+        destroy() {
+            this.quickSettingsItems?.forEach(i => {
+                if (!i._destroyed) i.destroy();
+            });
+            if (this._timerid) {
+                GLib.Source.remove(this._timerid);
+                this._timerid = 0;
+            }
+            this._indicator.destroy();
+            super.destroy();
+        }
+
     }
 );
 
@@ -256,43 +256,16 @@ export default class HotspotExtension extends Extension {
 
     enable() {
         // Get the settings for this extension
-        this._settings = this.getSettings('org.gnome.shell.extensions.gnome-hotspot-toggle');
-
-        // Defensive: if an instance already exists (e.g., GNOME Shell
-        // re-ran enable without disable during a suspend/resume edge case),
-        // destroy it first to avoid duplicate toggles.
-        if (_singletonIndicator && !_singletonIndicator._destroyed) {
-            try {
-                // Also explicitly destroy child quick setting items.
-                _singletonIndicator.quickSettingsItems?.forEach(i => {
-                    if (!i._destroyed) i.destroy();
-                });
-                _singletonIndicator.destroy();
-            } catch (e) {
-                // ignore
-            }
-            _singletonIndicator = null;
-        }
+        this._settings = this.getSettings('org.gnome.shell.extensions.hotspot-toggle');
 
         // Create the toggle and pass the settings to it
         this._indicator = new HotspotToggle(this._settings);
-        _singletonIndicator = this._indicator;
         Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
     }
 
     disable() {
-        if (this._indicator) {
-            try {
-                this._indicator.quickSettingsItems?.forEach(i => {
-                    if (!i._destroyed) i.destroy();
-                });
-                this._indicator.destroy();
-            } catch (e) {
-                // ignore
-            }
-        }
+        this._indicator.destroy();
         this._indicator = null;
         this._settings = null;
-        _singletonIndicator = null;
     }
 }
