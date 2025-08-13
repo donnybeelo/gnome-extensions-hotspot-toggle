@@ -1,0 +1,26 @@
+{
+	"name": "Hotspot Toggle",
+	"version": "2.0.0",
+	"description": "A GNOME Shell extension to toggle mobile hotspot on an Android device over Bluetooth.",
+	"type": "module",
+	"private": false,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/donnybeelo/gnome-extensions-hotspot-toggle.git"
+	},
+	"author": "Daniel Elia <d.elia@outlook.com>",
+	"bugs": {
+		"url": "https://github.com/donnybeelo/gnome-extensions-hotspot-toggle/issues"
+	},
+	"homepage": "https://github.com/donnybeelo/gnome-extensions-hotspot-toggle#readme",
+	"devDependencies": {
+		"@tsconfig/strictest": "^2.0.5",
+		"eslint": "^9.33.0",
+		"eslint-plugin-jsdoc": "^54.0.0",
+		"typescript": "^5.9.2"
+	},
+	"dependencies": {
+		"@girs/gjs": "^4.0.0-beta.25",
+		"@girs/gnome-shell": "^48.0.2"
+	}
+}
