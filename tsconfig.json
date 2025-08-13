@@ -8,13 +8,13 @@
     "target": "ES2022",
     "lib": [
       "ES2022"
-    ],
+    ]
   },
   "include": [
-    "ambient.d.ts",
+    "ambient.d.ts"
   ],
   "files": [
     "extension.ts",
     "prefs.ts"
-  ],
+  ]
 }

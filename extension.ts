@@ -258,8 +258,8 @@ const HotspotToggle = GObject.registerClass(
 
 // The main extension class
 export default class HotspotExtension extends Extension {
-    settings: any;
-    indicator: any;
+    settings!: Gio.Settings | null;
+    indicator!: InstanceType<typeof HotspotToggle> | null;
 
     enable() {
         // Get the settings for this extension
@@ -271,7 +271,7 @@ export default class HotspotExtension extends Extension {
     }
 
     disable() {
-        this.indicator.destroy();
+        this.indicator?.destroy();
         this.indicator = null;
         this.settings = null;
     }
