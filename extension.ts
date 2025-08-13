@@ -120,8 +120,9 @@ const HotspotToggle = GObject.registerClass(
                 await this._bluezConnectThenDisconnectDevice(devicePath);
 
                 await this._handleWiFi();
-            } catch (e: any) {
-                this._showNotification(_(`Error: ${e.message}`));
+            } catch (e: unknown) {
+                const message = e instanceof Error ? e.message : String(e);
+                this._showNotification(_(`Error: ${message}`));
                 this._setIndicatorVisibility();
             }
         }
