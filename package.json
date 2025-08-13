@@ -15,6 +15,7 @@
 	"homepage": "https://github.com/donnybeelo/gnome-extensions-hotspot-toggle#readme",
 	"devDependencies": {
 		"@tsconfig/strictest": "^2.0.5",
+		"@types/estree": "^1.0.8",
 		"eslint": "^9.33.0",
 		"eslint-plugin-jsdoc": "^54.0.0",
 		"typescript": "^5.9.2"
