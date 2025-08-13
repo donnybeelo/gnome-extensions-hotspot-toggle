@@ -4,7 +4,7 @@ import Gio from 'gi://Gio';
 import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 export default class HotspotPreferences extends ExtensionPreferences {
-    fillPreferencesWindow(window) {
+    async fillPreferencesWindow(window: Adw.PreferencesWindow) {
         // Create a new preferences page
         const page = new Adw.PreferencesPage();
         window.add(page);

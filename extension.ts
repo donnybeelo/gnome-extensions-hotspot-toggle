@@ -1,3 +1,4 @@
+import St from 'gi://St';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -7,10 +8,18 @@ import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.j
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
+interface RunResult {
+    success: boolean;
+    stdout: string;
+    stderr: string;
+}
 
 const HotspotToggle = GObject.registerClass(
     class HotspotToggle extends QuickSettings.SystemIndicator {
-        constructor(settings) {
+        _settings: Gio.Settings;
+        _timerid: number;
+        _indicator: St.Icon;
+        constructor(settings: Gio.Settings) {
             super();
 
             this._settings = settings;
@@ -20,7 +29,7 @@ const HotspotToggle = GObject.registerClass(
             this._indicator.icon_name = 'network-wireless-hotspot-symbolic';
             this._timerid = 0;
 
-            const toggle = new QuickSettings.QuickToggle({
+            const toggle: QuickSettings.QuickToggle = new QuickSettings.QuickToggle({
                 title: _('Phone Hotspot'),
                 iconName: 'network-wireless-hotspot-symbolic',
                 toggleMode: true,
@@ -31,31 +40,31 @@ const HotspotToggle = GObject.registerClass(
             this._setIndicatorVisibility()
         }
 
-        _showNotification(message) {
+        _showNotification(message: string): void {
             Main.notify('Phone Hotspot', message);
         }
 
-        async _run(command) {
+        async _run(command: string[]): Promise<RunResult> {
             // Minimal wrapper around Gio.Subprocess returning { success, stdout, stderr }
-            return await new Promise((resolve, reject) => {
-                let proc;
+            return await new Promise<RunResult>((resolve, reject) => {
+                let proc: Gio.Subprocess;
                 try {
                     proc = Gio.Subprocess.new(command, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
                 } catch (e) { reject(e); return; }
-                proc.communicate_utf8_async(null, null, (p, res) => {
+                proc.communicate_utf8_async(null, null, (_p: Gio.Subprocess | null, res: Gio.AsyncResult) => {
                     try {
-                        const [, stdout, stderr] = p.communicate_utf8_finish(res);
-                        resolve({ success: p.get_successful(), stdout: stdout || '', stderr: stderr || '' });
+                        const [, stdout, stderr] = proc.communicate_utf8_finish(res);
+                        resolve({ success: proc.get_successful(), stdout: stdout || '', stderr: stderr || '' });
                     } catch (e) { reject(e); }
                 });
             });
         }
 
-        _wait(seconds) {
+        _wait(seconds: number): Promise<void> {
             if (this._timerid) {
                 GLib.Source.remove(this._timerid);
             }
-            return new Promise(r => {
+            return new Promise<void>(r => {
                 this._timerid = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
                     this._timerid = 0;
                     r();
@@ -111,16 +120,16 @@ const HotspotToggle = GObject.registerClass(
                 await this._bluezConnectThenDisconnectDevice(devicePath);
 
                 await this._handleWiFi();
-            } catch (e) {
+            } catch (e: any) {
                 this._showNotification(_(`Error: ${e.message}`));
                 this._setIndicatorVisibility();
             }
         }
 
-        async _findBluezDevicePath(btAddress) {
+        async _findBluezDevicePath(btAddress: string): Promise<string | null> {
             // BlueZ device object paths are like /org/bluez/hci0/dev_XX_XX_XX_XX_XX_XX
             const formatted = btAddress.replace(/:/g, '_');
-            const manager = await new Promise((resolve, reject) => {
+            const manager: Gio.DBusProxy = await new Promise((resolve, reject) => {
                 Gio.DBusProxy.new_for_bus(
                     Gio.BusType.SYSTEM,
                     Gio.DBusProxyFlags.NONE,
@@ -138,7 +147,7 @@ const HotspotToggle = GObject.registerClass(
                     }
                 );
             });
-            const [objects] = await new Promise((resolve, reject) => {
+            const [objects] = await new Promise<[Record<string, Record<string, unknown>>]>((resolve, reject) => {
                 manager.call(
                     'GetManagedObjects',
                     null,
@@ -147,7 +156,7 @@ const HotspotToggle = GObject.registerClass(
                     null,
                     (proxy, res) => {
                         try {
-                            resolve(proxy.call_finish(res).deep_unpack());
+                            resolve(proxy?.call_finish(res).deep_unpack() as [Record<string, Record<string, unknown>>]);
                         } catch (e) {
                             reject(e);
                         }
@@ -163,8 +172,8 @@ const HotspotToggle = GObject.registerClass(
             return null;
         }
 
-        async _bluezConnectThenDisconnectDevice(devicePath) {
-            const device = await new Promise((resolve, reject) => {
+        async _bluezConnectThenDisconnectDevice(devicePath: string) {
+            const device: Gio.DBusProxy = await new Promise((resolve, reject) => {
                 Gio.DBusProxy.new_for_bus(
                     Gio.BusType.SYSTEM,
                     Gio.DBusProxyFlags.NONE,
@@ -183,7 +192,7 @@ const HotspotToggle = GObject.registerClass(
                 );
             });
 
-            const call = method => new Promise((resolve, reject) => {
+            const call = (method: string) => new Promise((resolve, reject) => {
                 device.call(
                     method,
                     null,
@@ -192,8 +201,8 @@ const HotspotToggle = GObject.registerClass(
                     null,
                     (proxy, res) => {
                         try {
-                            proxy.call_finish(res);
-                            resolve();
+                            proxy?.call_finish(res);
+                            resolve(undefined);
                         } catch (e) {
                             reject(e);
                         }
@@ -234,7 +243,7 @@ const HotspotToggle = GObject.registerClass(
         }
         destroy() {
             this.quickSettingsItems?.forEach(i => {
-                if (!i._destroyed) i.destroy();
+                i.destroy();
             });
             if (this._timerid) {
                 GLib.Source.remove(this._timerid);
@@ -249,23 +258,21 @@ const HotspotToggle = GObject.registerClass(
 
 // The main extension class
 export default class HotspotExtension extends Extension {
-    constructor(metadata) {
-        super(metadata);
-        this._indicator = null;
-    }
+    settings: any;
+    indicator: any;
 
     enable() {
         // Get the settings for this extension
-        this._settings = this.getSettings('org.gnome.shell.extensions.hotspot-toggle');
+        this.settings = this.getSettings('org.gnome.shell.extensions.hotspot-toggle');
 
         // Create the toggle and pass the settings to it
-        this._indicator = new HotspotToggle(this._settings);
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
+        this.indicator = new HotspotToggle(this.settings);
+        Main.panel.statusArea.quickSettings.addExternalIndicator(this.indicator);
     }
 
     disable() {
-        this._indicator.destroy();
-        this._indicator = null;
-        this._settings = null;
+        this.indicator.destroy();
+        this.indicator = null;
+        this.settings = null;
     }
 }
