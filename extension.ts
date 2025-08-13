@@ -19,6 +19,7 @@ const HotspotToggle = GObject.registerClass(
         _settings: Gio.Settings;
         _timerid: number;
         _indicator: St.Icon;
+        _running: boolean;
         constructor(settings: Gio.Settings) {
             super();
 
@@ -28,6 +29,7 @@ const HotspotToggle = GObject.registerClass(
             this._indicator.visible = false;
             this._indicator.icon_name = 'network-wireless-hotspot-symbolic';
             this._timerid = 0;
+            this._running = false;
 
             const toggle: QuickSettings.QuickToggle = new QuickSettings.QuickToggle({
                 title: _('Phone Hotspot'),
@@ -103,6 +105,11 @@ const HotspotToggle = GObject.registerClass(
         }
 
         async _toggleHotspot() {
+            if (this._running) {
+                this.quickSettingsItems[0].checked = !this.quickSettingsItems[0].checked
+                return
+            };
+            this._running = true;
             this._indicator.visible = !this._indicator.visible;
             const btAddress = this._settings.get_string('bluetooth-address');
             if (!btAddress || !btAddress.match(/^([0-9A-F]{2}:){5}([0-9A-F]{2})$/i)) {
@@ -120,10 +127,12 @@ const HotspotToggle = GObject.registerClass(
                 await this._bluezConnectThenDisconnectDevice(devicePath);
 
                 await this._handleWiFi();
+                this._running = false;
             } catch (e: unknown) {
                 const message = e instanceof Error ? e.message : String(e);
                 this._showNotification(_(`Error: ${message}`));
                 this._setIndicatorVisibility();
+                this._running = false;
             }
         }
 
