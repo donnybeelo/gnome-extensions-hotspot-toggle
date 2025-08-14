@@ -1,7 +1,7 @@
 {
     "uuid": "hotspot-toggle@donnybeelo.github.com",
     "name": "Hotspot Toggle",
-    "description": "A GNOME Shell extension to toggle mobile hotspot on an Android device over Bluetooth.",
+    "description": "A GNOME Shell extension to toggle mobile hotspot on an Android device over Bluetooth.\n\nRequires Automate flow to be running on the Android device (https://llamalab.com/automate/community/flows/50803)",
     "shell-version": [ "45", "46", "47", "48" ],
     "version": 1,
     "url": "https://github.com/donnybeelo/gnome-extensions-hotspot-toggle",
