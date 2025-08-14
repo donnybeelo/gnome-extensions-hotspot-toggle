@@ -49,7 +49,7 @@ export default class HotspotPreferences extends ExtensionPreferences {
 
         // Create a Gio.Settings instance for your extension schema
         // Make sure the schema_id matches your XML schema filename (without .xml)
-        const settings = new Gio.Settings({ schema_id: 'org.gnome.shell.extensions.gnome-hotspot-toggle' });
+        const settings = new Gio.Settings({ schema_id: 'org.gnome.shell.extensions.hotspot-toggle' });
 
         // Bind the entry text to the 'bluetooth-address' GSettings key
         settings.bind('bluetooth-address', bluetoothEntry, 'text', Gio.SettingsBindFlags.DEFAULT);
