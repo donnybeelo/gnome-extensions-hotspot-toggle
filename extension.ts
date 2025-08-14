@@ -39,7 +39,17 @@ const HotspotToggle = GObject.registerClass(
             toggle.connect('clicked', this._toggleHotspot.bind(this));
             this.quickSettingsItems.push(toggle);
 
-            this._setIndicatorVisibility()
+            const macNotSet = this._settings.get_string('bluetooth-address') === '';
+            const wifiNotSet = this._settings.get_string('wifi-ssid') === '';
+            if (macNotSet && wifiNotSet) {
+                this._showNotification(_('No Wi-Fi SSID set & no MAC address set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set them appropriately.'));
+            } else if (wifiNotSet) {
+                this._showNotification(_('No Wi-Fi SSID set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set it appropriately.'));
+            } else if (macNotSet) {
+                this._showNotification(_('No MAC address set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set it appropriately.'));
+            } else {
+                this._setIndicatorVisibility();
+            }
         }
 
         _showNotification(message: string): void {
