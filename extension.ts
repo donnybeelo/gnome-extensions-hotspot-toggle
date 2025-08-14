@@ -75,7 +75,7 @@ const HotspotToggle = GObject.registerClass(
             });
         }
 
-        async _setIndicatorVisibility() {
+        async _setIndicatorVisibility(connectIfFound: boolean = true) {
             const ssid = this._settings.get_string('wifi-ssid');
             await this._run(['nmcli', 'device', 'wifi', 'rescan']);
             const { stdout } = await this._run(['nmcli', '-t', '-f', 'active,ssid', 'dev', 'wifi']);
@@ -91,17 +91,20 @@ const HotspotToggle = GObject.registerClass(
                     break;
                 }
             }
-            if (found) {
-                this.quickSettingsItems[0].checked = true;
-                this._indicator.visible = true;
-                if (connect) {
-                    await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
-                    this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
+            if (connectIfFound) {
+                if (found) {
+                    this.quickSettingsItems[0].checked = true;
+                    this._indicator.visible = true;
+                    if (connect) {
+                        await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
+                        this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
+                    }
+                } else {
+                    this.quickSettingsItems[0].checked = false;
+                    this._indicator.visible = false;
                 }
-            } else {
-                this.quickSettingsItems[0].checked = false;
-                this._indicator.visible = false;
             }
+            return { found, connect };
         }
 
         async _toggleHotspot() {
@@ -109,8 +112,15 @@ const HotspotToggle = GObject.registerClass(
                 this.quickSettingsItems[0].checked = !this.quickSettingsItems[0].checked
                 return
             };
+
+            const { found: hotspotOn, connect: notConnected } = await this._setIndicatorVisibility(false);
+            const toggleOn = this.quickSettingsItems[0].checked;
+            if ((toggleOn && hotspotOn) || (!toggleOn && !hotspotOn)) {
+                await this._handleWiFi();
+                return;
+            }
+
             this._running = true;
-            this._indicator.visible = !this._indicator.visible;
             const btAddress = this._settings.get_string('bluetooth-address');
             if (!btAddress || !btAddress.match(/^([0-9A-F]{2}:){5}([0-9A-F]{2})$/i)) {
                 this._showNotification(_('Bluetooth address is not configured or invalid. Check that the set Bluetooth MAC Address is in the correct format.'));
@@ -121,6 +131,7 @@ const HotspotToggle = GObject.registerClass(
                 // Find the BlueZ device object path for the given MAC address
                 const devicePath = await this._findBluezDevicePath(btAddress);
                 if (!devicePath) {
+                    this._running = false;
                     throw new Error(_('Bluetooth device not found. Make sure Bluetooth is enabled and the device is paired.'));
                 }
                 // Connect to the device if not already connected
@@ -240,13 +251,18 @@ const HotspotToggle = GObject.registerClass(
                     connected = !!result?.success;
                     if (!connected) await this._wait(2);
                 }
-                if (connected)
+                if (connected) {
                     this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
-                else
+                    this._indicator.visible = true;
+                } else {
                     this._showNotification(_('Failed to connect to Wi-Fi network: ') + ssid);
+                    this._indicator.visible = false
+                    this.quickSettingsItems[0].checked = false
+                }
             } else {
                 await this._run(['nmcli', 'device', 'disconnect', 'wlo1'])
                 this._showNotification(_('Disconnected from Wi-Fi network: ') + ssid);
+                this._indicator.visible = false;
                 await this._run(['nmcli', 'device', 'wifi', 'rescan'])
                 await this._run(['nmcli', 'device', 'set', 'wlo1', 'autoconnect', 'on'])
             }
