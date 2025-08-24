@@ -2,13 +2,19 @@
 
 Toggle your Android phone's hotspot from the GNOME Shell Quick Settings menu!
 
-> Status: Early version / proof-of-concept. If you have issues, open a GitHub issue and I'll try and get on it!
+> Status: Proof-of-concept. If you have issues, open a GitHub issue and I'll try and get on it!
 
 ## Requirements
 
 - GNOME Shell 45–48 (haven't tested it with any version outside of GNOME 48 though)
 - NetworkManager with `nmcli`
 - An Android device with [Automate flow](https://llamalab.com/automate/community/flows/50803) downloaded (https://llamalab.com/automate/community/flows/50803)
+
+## Installation
+
+Install through (GNOME Extensions)[https://extensions.gnome.org/extension/8508/hotspot-toggle/] (https://extensions.gnome.org/extension/8508/hotspot-toggle/)
+
+To install manually, clone the repo, `cd` into the directory and run `make install`.
 
 ## Usage
 
