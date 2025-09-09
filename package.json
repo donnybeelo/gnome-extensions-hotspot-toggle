@@ -1,5 +1,5 @@
 {
-	"name": "Hotspot Toggle",
+	"name": "hotspot-toggle",
 	"version": "2.0.0",
 	"description": "A GNOME Shell extension to toggle mobile hotspot on an Android device over Bluetooth.",
 	"type": "module",
@@ -21,7 +21,11 @@
 		"typescript": "^5.9.2"
 	},
 	"dependencies": {
-		"@girs/gjs": "^4.0.0-beta.25",
-		"@girs/gnome-shell": "^48.0.2"
+		"@girs/gjs": "^4.0.0-beta.36",
+		"@girs/gnome-shell": "^48.0.4"
+	},
+	"peerDependencies": {
+  		"@girs/gtk-4.0": "^4.19.1-4.0.0-beta.36",
+  		"@girs/gnome-shell": "^48.0.4"
 	}
 }
