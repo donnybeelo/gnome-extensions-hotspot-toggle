@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'latest'
+permissions:
+  contents: write
 
 jobs:
   extension_bundle:
@@ -11,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
     - name: Create Release
       run: make pack
     - name: Upload Release
@@ -19,5 +21,6 @@ jobs:
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: hotspot-toggle.zip
-        tag: ${{ github.ref }}
+        tag: ${{ github.ref_name }}
+        overwrite: true
 
