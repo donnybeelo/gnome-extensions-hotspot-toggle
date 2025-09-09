@@ -16,6 +16,11 @@ interface RunResult {
 
 const HotspotToggle = GObject.registerClass(
     class HotspotToggle extends QuickSettings.SystemIndicator {
+        menu: any;
+        setSensitive: any;
+        setMenu: any;
+        container: any;
+
         _settings: Gio.Settings;
         _timerid: number;
         _indicator: St.Icon;
@@ -259,7 +264,7 @@ const HotspotToggle = GObject.registerClass(
                     await this._run(['nmcli', 'device', 'wifi', 'rescan'])
                     const result = await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
                     connected = !!result?.success;
-                    if (!connected) await this._wait(2);
+                    if (!connected) await this._wait(5);
                 }
                 if (connected) {
                     this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
