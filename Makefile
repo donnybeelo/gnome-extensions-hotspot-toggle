@@ -28,3 +28,9 @@ install: $(NAME).zip
 
 clean:
 	@rm -rf dist node_modules $(NAME).zip
+
+update-latest:
+	git tag -d latest
+	git push origin :latest
+	git tag -f latest
+	git push origin latest
