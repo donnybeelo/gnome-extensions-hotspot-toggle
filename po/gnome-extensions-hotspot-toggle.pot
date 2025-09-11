@@ -1,0 +1,106 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-09 18:59+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../extension.ts:40
+msgid "Phone Hotspot"
+msgstr ""
+
+#: ../extension.ts:50
+msgid ""
+"No Wi-Fi SSID set & no MAC address set. Go to Extension Manager > Cogwheel "
+"next to Hotspot Toggle and set them appropriately."
+msgstr ""
+
+#: ../extension.ts:52
+msgid ""
+"No Wi-Fi SSID set. Go to Extension Manager > Cogwheel next to Hotspot Toggle "
+"and set it appropriately."
+msgstr ""
+
+#: ../extension.ts:54
+msgid ""
+"No MAC address set. Go to Extension Manager > Cogwheel next to Hotspot "
+"Toggle and set it appropriately."
+msgstr ""
+
+#: ../extension.ts:115 ../extension.ts:270
+msgid "Connected to Wi-Fi network: "
+msgstr ""
+
+#: ../extension.ts:141
+msgid ""
+"Bluetooth address is not configured or invalid. Check that the set Bluetooth "
+"MAC Address is in the correct format."
+msgstr ""
+
+#: ../extension.ts:150
+msgid ""
+"Bluetooth device not found. Make sure Bluetooth is enabled and the device is "
+"paired."
+msgstr ""
+
+#: ../extension.ts:273
+msgid "Failed to connect to Wi-Fi network: "
+msgstr ""
+
+#: ../extension.ts:279
+msgid "Disconnected from Wi-Fi network: "
+msgstr ""
+
+#: ../prefs.ts:14
+msgid "Device Settings"
+msgstr ""
+
+#: ../prefs.ts:15
+msgid "Configure the Bluetooth device to connect to."
+msgstr ""
+
+#: ../prefs.ts:21
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:6
+msgid "Bluetooth MAC Address"
+msgstr ""
+
+#: ../prefs.ts:22
+msgid "e.g., 00:11:22:33:44:55"
+msgstr ""
+
+#: ../prefs.ts:27
+msgid "00:11:22:33:44:55"
+msgstr ""
+
+#: ../prefs.ts:36
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:11
+msgid "Wi-Fi SSID"
+msgstr ""
+
+#: ../prefs.ts:37
+msgid "e.g., MyWiFiNetwork"
+msgstr ""
+
+#: ../prefs.ts:42
+msgid "MyWiFiNetwork"
+msgstr ""
+
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:7
+msgid "The MAC address of the Bluetooth device to connect to."
+msgstr ""
+
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:12
+msgid "The SSID of the Wi-Fi network to connect to when toggling the hotspot."
+msgstr ""

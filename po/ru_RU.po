@@ -1,0 +1,113 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: Fraxinus Acer\n"
+"Language-Team: \n"
+"Language: ru_RU\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.6\n"
+
+#: ../extension.ts:40
+msgid "Phone Hotspot"
+msgstr "Точка доступа телефона"
+
+#: ../extension.ts:50
+msgid ""
+"No Wi-Fi SSID set & no MAC address set. Go to Extension Manager > Cogwheel "
+"next to Hotspot Toggle and set them appropriately."
+msgstr ""
+"Не установлен SSID Wi-Fi и MAC-адрес. Перейдите в Диспетчер расширений > "
+"Шестеренка рядом с переключателем точек доступа и настройте их "
+"соответствующим образом."
+
+#: ../extension.ts:52
+msgid ""
+"No Wi-Fi SSID set. Go to Extension Manager > Cogwheel next to Hotspot Toggle "
+"and set it appropriately."
+msgstr ""
+"SSID Wi-Fi не установлен. Перейдите в Диспетчер расширений > Шестеренка "
+"рядом с переключателем точек доступа и настройте его соответствующим образом."
+
+#: ../extension.ts:54
+msgid ""
+"No MAC address set. Go to Extension Manager > Cogwheel next to Hotspot "
+"Toggle and set it appropriately."
+msgstr ""
+"MAC-адрес не задан. Перейдите в Диспетчер расширений > Шестеренка рядом с "
+"переключателем точек доступа и настройте его соответствующим образом."
+
+#: ../extension.ts:115 ../extension.ts:270
+msgid "Connected to Wi-Fi network: "
+msgstr "Подключен к сети Wi-Fi: "
+
+#: ../extension.ts:141
+msgid ""
+"Bluetooth address is not configured or invalid. Check that the set Bluetooth "
+"MAC Address is in the correct format."
+msgstr ""
+"Адрес Bluetooth не настроен или не доступен. Убедитесь, что заданный MAC-"
+"адрес Bluetooth указан в правильном формате."
+
+#: ../extension.ts:150
+msgid ""
+"Bluetooth device not found. Make sure Bluetooth is enabled and the device is "
+"paired."
+msgstr ""
+"Устройство Bluetooth не найдено. Убедитесь, что Bluetooth включен и "
+"устройства сопряжены."
+
+#: ../extension.ts:273
+msgid "Failed to connect to Wi-Fi network: "
+msgstr "Не удалось подключиться к сети Wi-Fi: "
+
+#: ../extension.ts:279
+msgid "Disconnected from Wi-Fi network: "
+msgstr "Отключиться от сети Wi-Fi: "
+
+#: ../prefs.ts:14
+msgid "Device Settings"
+msgstr "Настройки устройства"
+
+#: ../prefs.ts:15
+msgid "Configure the Bluetooth device to connect to."
+msgstr "Настройте устройство Bluetooth для подключения."
+
+#: ../prefs.ts:21
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:6
+msgid "Bluetooth MAC Address"
+msgstr "Bluetooth MAC-адрес"
+
+#: ../prefs.ts:22
+msgid "e.g., 00:11:22:33:44:55"
+msgstr "т.е.: 00:11:22:33:44:55"
+
+#: ../prefs.ts:27
+msgid "00:11:22:33:44:55"
+msgstr "00:11:22:33:44:55"
+
+#: ../prefs.ts:36
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:11
+msgid "Wi-Fi SSID"
+msgstr "Wi-Fi SSID"
+
+#: ../prefs.ts:37
+msgid "e.g., MyWiFiNetwork"
+msgstr "т.е.: MyWiFiNetwork"
+
+#: ../prefs.ts:42
+msgid "MyWiFiNetwork"
+msgstr "MyWiFiNetwork"
+
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:7
+msgid "The MAC address of the Bluetooth device to connect to."
+msgstr "MAC-адрес устройства Bluetooth, к которому необходимо подключиться."
+
+#: ../schemas/org.gnome.shell.extensions.hotspot-toggle.gschema.xml:12
+msgid "The SSID of the Wi-Fi network to connect to when toggling the hotspot."
+msgstr ""
+"SSID сети Wi-Fi, к которой необходимо подключиться при переключении точки "
+"доступа."
