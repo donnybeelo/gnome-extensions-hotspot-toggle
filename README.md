@@ -12,7 +12,7 @@ Toggle your Android phone's hotspot from the GNOME Shell Quick Settings menu!
 
 ## Installation
 
-Install through (GNOME Extensions)[https://extensions.gnome.org/extension/8508/hotspot-toggle/] (https://extensions.gnome.org/extension/8508/hotspot-toggle/)
+Install through [GNOME Extensions](https://extensions.gnome.org/extension/8508/hotspot-toggle/) (https://extensions.gnome.org/extension/8508/hotspot-toggle/)
 
 To install manually, clone the repo, `cd` into the directory and run `make install`.
 
