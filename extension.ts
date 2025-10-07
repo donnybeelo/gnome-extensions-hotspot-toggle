@@ -90,27 +90,31 @@ const HotspotToggle = GObject.registerClass(
             });
         }
 
-        async _setIndicatorVisibility(connectIfFound: boolean = true) {
-            const ssid = this._settings.get_string('wifi-ssid');
-            await this._run(['nmcli', 'device', 'wifi', 'rescan']);
+        async _isConnectedToSSID(ssid: string): Promise<{ found: boolean; connected: boolean }> {
             const { stdout } = await this._run(['nmcli', '-t', '-f', 'active,ssid', 'dev', 'wifi']);
             const connections = stdout ? stdout.split('\n') : [];
             let found = false;
-            let connect = false;
+            let connected = false;
             for (const line of connections) {
                 if (line.includes(ssid)) {
                     found = true;
-                    if (line.startsWith('no:')) {
-                        connect = true
+                    if (line.startsWith('yes:')) {
+                        connected = true
                     }
                     break;
                 }
             }
+            return { found, connected }
+        }
+
+        async _setIndicatorVisibility(connectIfFound: boolean = true) {
+            const ssid = this._settings.get_string('wifi-ssid');
+            const { found, connected } = await this._isConnectedToSSID(ssid);
             if (connectIfFound) {
                 if (found) {
                     this.quickSettingsItems[0].checked = true;
                     this._indicator.visible = true;
-                    if (connect) {
+                    if (!connected) {
                         await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
                         this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
                     }
@@ -119,7 +123,7 @@ const HotspotToggle = GObject.registerClass(
                     this._indicator.visible = false;
                 }
             }
-            return { found, connect };
+            return found;
         }
 
         async _toggleHotspot() {
@@ -128,7 +132,7 @@ const HotspotToggle = GObject.registerClass(
                 return
             };
 
-            const { found: hotspotOn, connect: notConnected } = await this._setIndicatorVisibility(false);
+            const hotspotOn = await this._setIndicatorVisibility(false);
             const toggleOn = this.quickSettingsItems[0].checked;
             if ((toggleOn && hotspotOn) || (!toggleOn && !hotspotOn)) {
                 await this._handleWiFi();
@@ -261,6 +265,11 @@ const HotspotToggle = GObject.registerClass(
             if (this.quickSettingsItems[0].checked) {
                 let attempt = 0, connected = false;
                 while (!connected && attempt++ < 5) {
+                    if ((await this._isConnectedToSSID(ssid)).connected) {
+                        this._showNotification(_('Already connected to Wi-Fi network: ') + ssid);
+                        this._indicator.visible = true;
+                        return;
+                    }
                     await this._run(['nmcli', 'device', 'wifi', 'rescan'])
                     const result = await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
                     connected = !!result?.success;
@@ -275,6 +284,11 @@ const HotspotToggle = GObject.registerClass(
                     this.quickSettingsItems[0].checked = false
                 }
             } else {
+                if (!(await this._isConnectedToSSID(ssid)).found) {
+                    this._showNotification(_('Already disconnected from Wi-Fi network: ') + ssid);
+                    this._indicator.visible = false;
+                    return;
+                }
                 await this._run(['nmcli', 'device', 'disconnect', 'wlo1'])
                 this._showNotification(_('Disconnected from Wi-Fi network: ') + ssid);
                 this._indicator.visible = false;
