@@ -1,333 +1,410 @@
-import St from 'gi://St';
-import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
+import St from "gi://St";
+import Gio from "gi://Gio";
+import GLib from "gi://GLib";
+import GObject from "gi://GObject";
 
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
-import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
+import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
+import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as QuickSettings from "resource:///org/gnome/shell/ui/quickSettings.js";
 
 interface RunResult {
-    success: boolean;
-    stdout: string;
-    stderr: string;
+	success: boolean;
+	stdout: string;
+	stderr: string;
 }
 
 const HotspotToggle = GObject.registerClass(
-    class HotspotToggle extends QuickSettings.SystemIndicator {
-        menu: any;
-        setSensitive: any;
-        setMenu: any;
-        container: any;
+	class HotspotToggle extends QuickSettings.SystemIndicator {
+		menu: any;
+		setSensitive: any;
+		setMenu: any;
+		container: any;
 
-        _settings: Gio.Settings;
-        _timerid: number;
-        _indicator: St.Icon;
-        _running: boolean;
-        constructor(settings: Gio.Settings) {
-            super();
+		_settings: Gio.Settings;
+		_timerid: number;
+		_indicator: St.Icon;
+		_running: boolean;
+		constructor(settings: Gio.Settings) {
+			super();
 
-            this._settings = settings;
+			this._settings = settings;
 
-            this._indicator = this._addIndicator();
-            this._indicator.visible = false;
-            this._indicator.icon_name = 'network-wireless-hotspot-symbolic';
-            this._timerid = 0;
-            this._running = false;
+			this._indicator = this._addIndicator();
+			this._indicator.visible = false;
+			this._indicator.icon_name = "network-wireless-hotspot-symbolic";
+			this._timerid = 0;
+			this._running = false;
 
-            const toggle: QuickSettings.QuickToggle = new QuickSettings.QuickToggle({
-                title: _('Phone Hotspot'),
-                iconName: 'network-wireless-hotspot-symbolic',
-                toggleMode: true,
-            });
-            toggle.connect('clicked', this._toggleHotspot.bind(this));
-            this.quickSettingsItems.push(toggle);
+			const toggle: QuickSettings.QuickToggle = new QuickSettings.QuickToggle({
+				title: _("Phone Hotspot"),
+				iconName: "network-wireless-hotspot-symbolic",
+				toggleMode: true,
+			});
+			toggle.connect("clicked", this._toggleHotspot.bind(this));
+			this.quickSettingsItems.push(toggle);
 
-            const macNotSet = this._settings.get_string('bluetooth-address') === '';
-            const wifiNotSet = this._settings.get_string('wifi-ssid') === '';
-            if (macNotSet && wifiNotSet) {
-                this._showNotification(_('No Wi-Fi SSID set & no MAC address set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set them appropriately.'));
-            } else if (wifiNotSet) {
-                this._showNotification(_('No Wi-Fi SSID set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set it appropriately.'));
-            } else if (macNotSet) {
-                this._showNotification(_('No MAC address set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set it appropriately.'));
-            } else {
-                this._setIndicatorVisibility();
-            }
-        }
+			const macNotSet = this._settings.get_string("bluetooth-address") === "";
+			const wifiNotSet = this._settings.get_string("wifi-ssid") === "";
+			if (macNotSet && wifiNotSet) {
+				this._showNotification(
+					_(
+						"No Wi-Fi SSID set & no MAC address set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set them appropriately.",
+					),
+				);
+			} else if (wifiNotSet) {
+				this._showNotification(
+					_(
+						"No Wi-Fi SSID set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set it appropriately.",
+					),
+				);
+			} else if (macNotSet) {
+				this._showNotification(
+					_(
+						"No MAC address set. Go to Extension Manager > Cogwheel next to Hotspot Toggle and set it appropriately.",
+					),
+				);
+			} else {
+				this._setIndicatorVisibility();
+			}
+		}
 
-        _showNotification(message: string): void {
-            Main.notify('Phone Hotspot', message);
-        }
+		_showNotification(message: string): void {
+			Main.notify("Phone Hotspot", message);
+		}
 
-        async _run(command: string[]): Promise<RunResult> {
-            // Minimal wrapper around Gio.Subprocess returning { success, stdout, stderr }
-            return await new Promise<RunResult>((resolve, reject) => {
-                let proc: Gio.Subprocess;
-                try {
-                    proc = Gio.Subprocess.new(command, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
-                } catch (e) { reject(e); return; }
-                proc.communicate_utf8_async(null, null, (_p: Gio.Subprocess | null, res: Gio.AsyncResult) => {
-                    try {
-                        const [, stdout, stderr] = proc.communicate_utf8_finish(res);
-                        resolve({ success: proc.get_successful(), stdout: stdout || '', stderr: stderr || '' });
-                    } catch (e) { reject(e); }
-                });
-            });
-        }
+		async _run(command: string[]): Promise<RunResult> {
+			// Minimal wrapper around Gio.Subprocess returning { success, stdout, stderr }
+			return await new Promise<RunResult>((resolve, reject) => {
+				let proc: Gio.Subprocess;
+				try {
+					proc = Gio.Subprocess.new(
+						command,
+						Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+					);
+				} catch (e) {
+					reject(e);
+					return;
+				}
+				proc.communicate_utf8_async(
+					null,
+					null,
+					(_p: Gio.Subprocess | null, res: Gio.AsyncResult) => {
+						try {
+							const [, stdout, stderr] = proc.communicate_utf8_finish(res);
+							resolve({
+								success: proc.get_successful(),
+								stdout: stdout || "",
+								stderr: stderr || "",
+							});
+						} catch (e) {
+							reject(e);
+						}
+					},
+				);
+			});
+		}
 
-        _wait(seconds: number): Promise<void> {
-            if (this._timerid) {
-                GLib.Source.remove(this._timerid);
-            }
-            return new Promise<void>(r => {
-                this._timerid = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
-                    this._timerid = 0;
-                    r();
-                    return GLib.SOURCE_REMOVE;
-                });
-            });
-        }
+		_wait(seconds: number): Promise<void> {
+			if (this._timerid) {
+				GLib.Source.remove(this._timerid);
+			}
+			return new Promise<void>((r) => {
+				this._timerid = GLib.timeout_add_seconds(
+					GLib.PRIORITY_DEFAULT,
+					seconds,
+					() => {
+						this._timerid = 0;
+						r();
+						return GLib.SOURCE_REMOVE;
+					},
+				);
+			});
+		}
 
-        async _isConnectedToSSID(ssid: string): Promise<{ found: boolean; connected: boolean }> {
-            const { stdout } = await this._run(['nmcli', '-t', '-f', 'active,ssid', 'dev', 'wifi']);
-            const connections = stdout ? stdout.split('\n') : [];
-            let found = false;
-            let connected = false;
-            for (const line of connections) {
-                if (line.includes(ssid)) {
-                    found = true;
-                    if (line.startsWith('yes:')) {
-                        connected = true
-                    }
-                    break;
-                }
-            }
-            return { found, connected }
-        }
+		async _isConnectedToSSID(
+			ssid: string,
+		): Promise<{ found: boolean; connected: boolean }> {
+			const { stdout } = await this._run([
+				"nmcli",
+				"-t",
+				"-f",
+				"active,ssid",
+				"dev",
+				"wifi",
+			]);
+			const connections = stdout ? stdout.split("\n") : [];
+			let found = false;
+			let connected = false;
+			for (const line of connections) {
+				if (line.includes(ssid)) {
+					found = true;
+					if (line.startsWith("yes:")) {
+						connected = true;
+					}
+					break;
+				}
+			}
+			return { found, connected };
+		}
 
-        async _setIndicatorVisibility(connectIfFound: boolean = true) {
-            const ssid = this._settings.get_string('wifi-ssid');
-            const { found, connected } = await this._isConnectedToSSID(ssid);
-            if (connectIfFound) {
-                if (found) {
-                    this.quickSettingsItems[0].checked = true;
-                    this._indicator.visible = true;
-                    if (!connected) {
-                        await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
-                        this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
-                    }
-                } else {
-                    this.quickSettingsItems[0].checked = false;
-                    this._indicator.visible = false;
-                }
-            }
-            return found;
-        }
+		async _setIndicatorVisibility(connectIfFound: boolean = true) {
+			const ssid = this._settings.get_string("wifi-ssid");
+			const { found, connected } = await this._isConnectedToSSID(ssid);
+			if (connectIfFound) {
+				if (found) {
+					this.quickSettingsItems[0].checked = true;
+					this._indicator.visible = true;
+					if (!connected) {
+						await this._run(["nmcli", "device", "wifi", "connect", ssid]);
+						this._showNotification(_("Connected to Wi-Fi network: ") + ssid);
+					}
+				} else {
+					this.quickSettingsItems[0].checked = false;
+					this._indicator.visible = false;
+				}
+			}
+			return found;
+		}
 
-        async _toggleHotspot() {
-            if (this._running) {
-                this.quickSettingsItems[0].checked = !this.quickSettingsItems[0].checked
-                return
-            };
+		async _toggleHotspot() {
+			if (this._running) {
+				this.quickSettingsItems[0].checked =
+					!this.quickSettingsItems[0].checked;
+				return;
+			}
 
-            const hotspotOn = await this._setIndicatorVisibility(false);
-            const toggleOn = this.quickSettingsItems[0].checked;
-            if ((toggleOn && hotspotOn) || (!toggleOn && !hotspotOn)) {
-                await this._handleWiFi();
-                return;
-            }
+			const hotspotOn = await this._setIndicatorVisibility(false);
+			const toggleOn = this.quickSettingsItems[0].checked;
+			if ((toggleOn && hotspotOn) || (!toggleOn && !hotspotOn)) {
+				await this._handleWiFi();
+				return;
+			}
 
-            this._running = true;
-            const btAddress = this._settings.get_string('bluetooth-address');
-            if (!btAddress || !btAddress.match(/^([0-9A-F]{2}:){5}([0-9A-F]{2})$/i)) {
-                this._showNotification(_('Bluetooth address is not configured or invalid. Check that the set Bluetooth MAC Address is in the correct format.'));
-                this._setIndicatorVisibility();
-                return;
-            }
-            try {
-                // Find the BlueZ device object path for the given MAC address
-                const devicePath = await this._findBluezDevicePath(btAddress);
-                if (!devicePath) {
-                    this._running = false;
-                    throw new Error(_('Bluetooth device not found. Make sure Bluetooth is enabled and the device is paired.'));
-                }
-                // Connect to the device if not already connected
-                await this._bluezConnectThenDisconnectDevice(devicePath);
+			this._running = true;
+			const btAddress = this._settings.get_string("bluetooth-address");
+			if (!btAddress || !btAddress.match(/^([0-9A-F]{2}:){5}([0-9A-F]{2})$/i)) {
+				this._showNotification(
+					_(
+						"Bluetooth address is not configured or invalid. Check that the set Bluetooth MAC Address is in the correct format.",
+					),
+				);
+				this._setIndicatorVisibility();
+				return;
+			}
+			try {
+				// Find the BlueZ device object path for the given MAC address
+				const devicePath = await this._findBluezDevicePath(btAddress);
+				if (!devicePath) {
+					this._running = false;
+					throw new Error(
+						_(
+							"Bluetooth device not found. Make sure Bluetooth is enabled and the device is paired.",
+						),
+					);
+				}
+				// Connect to the device if not already connected
+				await this._bluezConnectThenDisconnectDevice(devicePath);
 
-                await this._handleWiFi();
-                this._running = false;
-            } catch (e: unknown) {
-                const message = e instanceof Error ? e.message : String(e);
-                this._showNotification(_(`Error: ${message}`));
-                this._setIndicatorVisibility();
-                this._running = false;
-            }
-        }
+				await this._handleWiFi();
+				this._running = false;
+			} catch (e: unknown) {
+				const message = e instanceof Error ? e.message : String(e);
+				this._showNotification(_(`Error: ${message}`));
+				this._setIndicatorVisibility();
+				this._running = false;
+			}
+		}
 
-        async _findBluezDevicePath(btAddress: string): Promise<string | null> {
-            // BlueZ device object paths are like /org/bluez/hci0/dev_XX_XX_XX_XX_XX_XX
-            const formatted = btAddress.replace(/:/g, '_');
-            const manager: Gio.DBusProxy = await new Promise((resolve, reject) => {
-                Gio.DBusProxy.new_for_bus(
-                    Gio.BusType.SYSTEM,
-                    Gio.DBusProxyFlags.NONE,
-                    null,
-                    'org.bluez',
-                    '/',
-                    'org.freedesktop.DBus.ObjectManager',
-                    null,
-                    (src, res) => {
-                        try {
-                            resolve(Gio.DBusProxy.new_for_bus_finish(res));
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }
-                );
-            });
-            const [objects] = await new Promise<[Record<string, Record<string, unknown>>]>((resolve, reject) => {
-                manager.call(
-                    'GetManagedObjects',
-                    null,
-                    Gio.DBusCallFlags.NONE,
-                    -1,
-                    null,
-                    (proxy, res) => {
-                        try {
-                            resolve(proxy?.call_finish(res).deep_unpack() as [Record<string, Record<string, unknown>>]);
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }
-                );
-            });
+		async _findBluezDevicePath(btAddress: string): Promise<string | null> {
+			// BlueZ device object paths are like /org/bluez/hci0/dev_XX_XX_XX_XX_XX_XX
+			const formatted = btAddress.replace(/:/g, "_");
+			const manager: Gio.DBusProxy = await new Promise((resolve, reject) => {
+				Gio.DBusProxy.new_for_bus(
+					Gio.BusType.SYSTEM,
+					Gio.DBusProxyFlags.NONE,
+					null,
+					"org.bluez",
+					"/",
+					"org.freedesktop.DBus.ObjectManager",
+					null,
+					(src, res) => {
+						try {
+							resolve(Gio.DBusProxy.new_for_bus_finish(res));
+						} catch (e) {
+							reject(e);
+						}
+					},
+				);
+			});
+			const [objects] = await new Promise<
+				[Record<string, Record<string, unknown>>]
+			>((resolve, reject) => {
+				manager.call(
+					"GetManagedObjects",
+					null,
+					Gio.DBusCallFlags.NONE,
+					-1,
+					null,
+					(proxy, res) => {
+						try {
+							resolve(
+								proxy?.call_finish(res).deep_unpack() as [
+									Record<string, Record<string, unknown>>,
+								],
+							);
+						} catch (e) {
+							reject(e);
+						}
+					},
+				);
+			});
 
-            for (let [path, interfaces] of Object.entries(objects)) {
-                if (interfaces['org.bluez.Device1'] && path.endsWith(`dev_${formatted}`)) {
-                    return path;
-                }
-            }
-            return null;
-        }
+			for (let [path, interfaces] of Object.entries(objects)) {
+				if (
+					interfaces["org.bluez.Device1"] &&
+					path.endsWith(`dev_${formatted}`)
+				) {
+					return path;
+				}
+			}
+			return null;
+		}
 
-        async _bluezConnectThenDisconnectDevice(devicePath: string) {
-            const device: Gio.DBusProxy = await new Promise((resolve, reject) => {
-                Gio.DBusProxy.new_for_bus(
-                    Gio.BusType.SYSTEM,
-                    Gio.DBusProxyFlags.NONE,
-                    null,
-                    'org.bluez',
-                    devicePath,
-                    'org.bluez.Device1',
-                    null,
-                    (src, res) => {
-                        try {
-                            resolve(Gio.DBusProxy.new_for_bus_finish(res));
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }
-                );
-            });
+		async _bluezConnectThenDisconnectDevice(devicePath: string) {
+			const device: Gio.DBusProxy = await new Promise((resolve, reject) => {
+				Gio.DBusProxy.new_for_bus(
+					Gio.BusType.SYSTEM,
+					Gio.DBusProxyFlags.NONE,
+					null,
+					"org.bluez",
+					devicePath,
+					"org.bluez.Device1",
+					null,
+					(src, res) => {
+						try {
+							resolve(Gio.DBusProxy.new_for_bus_finish(res));
+						} catch (e) {
+							reject(e);
+						}
+					},
+				);
+			});
 
-            const call = (method: string) => new Promise((resolve, reject) => {
-                device.call(
-                    method,
-                    null,
-                    Gio.DBusCallFlags.NONE,
-                    -1,
-                    null,
-                    (proxy, res) => {
-                        try {
-                            proxy?.call_finish(res);
-                            resolve(undefined);
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }
-                );
-            });
-            const connected = device.get_cached_property('Connected')?.unpack();
-            if (connected) {
-                await call('Disconnect');
-                await this._wait(2); // Wait for disconnect to complete
-                await call('Connect');
-            } else {
-                await call('Connect');
-                await call('Disconnect');
-            }
-        }
+			const call = (method: string) =>
+				new Promise((resolve, reject) => {
+					device.call(
+						method,
+						null,
+						Gio.DBusCallFlags.NONE,
+						-1,
+						null,
+						(proxy, res) => {
+							try {
+								proxy?.call_finish(res);
+								resolve(undefined);
+							} catch (e) {
+								reject(e);
+							}
+						},
+					);
+				});
+			const connected = device.get_cached_property("Connected")?.unpack();
+			if (connected) {
+				await call("Disconnect");
+				await this._wait(2); // Wait for disconnect to complete
+				await call("Connect");
+			} else {
+				await call("Connect");
+				await call("Disconnect");
+			}
+		}
 
-        async _handleWiFi() {
-            const ssid = this._settings.get_string('wifi-ssid');
-            if (this.quickSettingsItems[0].checked) {
-                let attempt = 0, connected = false;
-                while (!connected && attempt++ < 5) {
-                    if ((await this._isConnectedToSSID(ssid)).connected) {
-                        this._showNotification(_('Already connected to Wi-Fi network: ') + ssid);
-                        this._indicator.visible = true;
-                        return;
-                    }
-                    await this._run(['nmcli', 'device', 'wifi', 'rescan'])
-                    const result = await this._run(['nmcli', 'device', 'wifi', 'connect', ssid])
-                    connected = !!result?.success;
-                    if (!connected) await this._wait(5);
-                }
-                if (connected) {
-                    this._showNotification(_('Connected to Wi-Fi network: ') + ssid);
-                    this._indicator.visible = true;
-                } else {
-                    this._showNotification(_('Failed to connect to Wi-Fi network: ') + ssid);
-                    this._indicator.visible = false
-                    this.quickSettingsItems[0].checked = false
-                }
-            } else {
-                if (!(await this._isConnectedToSSID(ssid)).found) {
-                    this._showNotification(_('Already disconnected from Wi-Fi network: ') + ssid);
-                    this._indicator.visible = false;
-                    return;
-                }
-                await this._run(['nmcli', 'device', 'disconnect', 'wlo1'])
-                this._showNotification(_('Disconnected from Wi-Fi network: ') + ssid);
-                this._indicator.visible = false;
-                await this._run(['nmcli', 'device', 'wifi', 'rescan'])
-                await this._run(['nmcli', 'device', 'set', 'wlo1', 'autoconnect', 'on'])
-            }
-        }
-        destroy() {
-            this.quickSettingsItems?.forEach(i => {
-                i.destroy();
-            });
-            if (this._timerid) {
-                GLib.Source.remove(this._timerid);
-                this._timerid = 0;
-            }
-            this._indicator.destroy();
-            super.destroy();
-        }
-
-    }
+		async _handleWiFi() {
+			const ssid = this._settings.get_string("wifi-ssid");
+			if (this.quickSettingsItems[0].checked) {
+				let attempt = 0,
+					connected = false;
+				while (!connected && attempt++ < 5) {
+					if ((await this._isConnectedToSSID(ssid)).connected) {
+						this._showNotification(_("Connected to Wi-Fi network: ") + ssid);
+						this._indicator.visible = true;
+						return;
+					}
+					await this._run(["nmcli", "device", "wifi", "rescan"]);
+					const result = await this._run([
+						"nmcli",
+						"device",
+						"wifi",
+						"connect",
+						ssid,
+					]);
+					connected = !!result?.success;
+					if (!connected) await this._wait(5);
+				}
+				if (connected) {
+					this._showNotification(_("Connected to Wi-Fi network: ") + ssid);
+					this._indicator.visible = true;
+				} else {
+					this._showNotification(
+						_("Failed to connect to Wi-Fi network: ") + ssid,
+					);
+					this._indicator.visible = false;
+					this.quickSettingsItems[0].checked = false;
+				}
+			} else {
+				if (!(await this._isConnectedToSSID(ssid)).found) {
+					this._showNotification(_("Disconnected from Wi-Fi network: ") + ssid);
+					this._indicator.visible = false;
+					return;
+				}
+				await this._run(["nmcli", "device", "disconnect", "wlo1"]);
+				this._showNotification(_("Disconnected from Wi-Fi network: ") + ssid);
+				this._indicator.visible = false;
+				await this._run(["nmcli", "device", "wifi", "rescan"]);
+				await this._run([
+					"nmcli",
+					"device",
+					"set",
+					"wlo1",
+					"autoconnect",
+					"on",
+				]);
+			}
+		}
+		destroy() {
+			this.quickSettingsItems?.forEach((i) => {
+				i.destroy();
+			});
+			if (this._timerid) {
+				GLib.Source.remove(this._timerid);
+				this._timerid = 0;
+			}
+			this._indicator.destroy();
+			super.destroy();
+		}
+	},
 );
 
 // The main extension class
 export default class HotspotExtension extends Extension {
-    settings!: Gio.Settings | null;
-    indicator!: InstanceType<typeof HotspotToggle> | null;
+	settings!: Gio.Settings | null;
+	indicator!: InstanceType<typeof HotspotToggle> | null;
 
-    enable() {
-        // Get the settings for this extension
-        this.settings = this.getSettings('org.gnome.shell.extensions.hotspot-toggle');
+	enable() {
+		// Get the settings for this extension
+		this.settings = this.getSettings(
+			"org.gnome.shell.extensions.hotspot-toggle",
+		);
 
-        // Create the toggle and pass the settings to it
-        this.indicator = new HotspotToggle(this.settings);
-        Main.panel.statusArea.quickSettings.addExternalIndicator(this.indicator);
-    }
+		// Create the toggle and pass the settings to it
+		this.indicator = new HotspotToggle(this.settings);
+		Main.panel.statusArea.quickSettings.addExternalIndicator(this.indicator);
+	}
 
-    disable() {
-        this.indicator?.destroy();
-        this.indicator = null;
-        this.settings = null;
-    }
+	disable() {
+		this.indicator?.destroy();
+		this.indicator = null;
+		this.settings = null;
+	}
 }
