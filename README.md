@@ -6,7 +6,7 @@ Toggle your Android phone's hotspot from the GNOME Shell Quick Settings menu!
 
 ## Requirements
 
-- GNOME Shell 45–48 (haven't tested it with any version outside of GNOME 48 though)
+- GNOME Shell 45–49 (haven't tested it with any version outside of GNOME 48 though)
 - NetworkManager with `nmcli`
 - An Android device with [Automate flow](https://llamalab.com/automate/community/flows/50803) downloaded (https://llamalab.com/automate/community/flows/50803)
 
