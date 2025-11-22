@@ -6,10 +6,10 @@ DOMAIN=donnybeelo.github.com
 all: dist/extension.js
 
 node_modules: package.json
-	npm install
+	bun install
 
 dist/extension.js dist/prefs.js: node_modules
-	npx tsc
+	bunx tsc
 
 schemas/gschemas.compiled: schemas/org.gnome.shell.extensions.$(NAME).gschema.xml
 	glib-compile-schemas schemas
@@ -35,3 +35,5 @@ update-latest:
 	git push origin :latest
 	git tag -f latest
 	git push origin latest
+	make pack
+	open "https://extensions.gnome.org/upload/"
