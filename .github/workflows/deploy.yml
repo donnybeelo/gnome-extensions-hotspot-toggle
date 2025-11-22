@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     tags:
-      - '**'
+      - "**"
 permissions:
   contents: write
 
@@ -12,13 +12,17 @@ jobs:
     name: Extension Bundle
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-    - name: Create Release
-      run: make pack
-    - name: Upload Release
-      uses: svenstaro/upload-release-action@2.11.2
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: hotspot-toggle.zip
-        tag: ${{ github.ref_name }}
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      - name: Create Release
+        run: make pack
+      - name: Upload Release
+        uses: svenstaro/upload-release-action@2.11.2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: hotspot-toggle.zip
+          tag: ${{ github.ref_name }}

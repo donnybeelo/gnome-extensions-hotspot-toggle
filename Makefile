@@ -36,4 +36,5 @@ update-latest:
 	git tag -f latest
 	git push origin latest
 	make pack
+	open .
 	open "https://extensions.gnome.org/upload/"
