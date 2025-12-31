@@ -192,7 +192,15 @@ const HotspotToggle = GObject.registerClass(
 				this._setIndicatorVisibility();
 				return;
 			}
+			let wasBluetoothDisabled = false;
 			try {
+				// Check if Bluetooth is enabled, and enable it if not
+				const bluetoothStatus = await this._run(["bluetoothctl", "show"]);
+				if (bluetoothStatus.stdout && !bluetoothStatus.stdout.includes("Powered: yes")) {
+					wasBluetoothDisabled = true;
+					await this._run(["rfkill", "unblock", "bluetooth"]);
+					await this._wait(1); // Wait for Bluetooth to fully power on
+				}
 				// Find the BlueZ device object path for the given MAC address
 				const devicePath = await this._findBluezDevicePath(btAddress);
 				if (!devicePath) {
@@ -205,6 +213,9 @@ const HotspotToggle = GObject.registerClass(
 				}
 				// Connect to the device if not already connected
 				await this._bluezConnectThenDisconnectDevice(devicePath);
+				if (wasBluetoothDisabled) {
+					await this._run(["rfkill", "block", "bluetooth"]);
+				}
 
 				await this._handleWiFi();
 				this._running = false;
@@ -324,22 +335,29 @@ const HotspotToggle = GObject.registerClass(
 			const ssid = this._settings.get_string("wifi-ssid");
 			if (this.quickSettingsItems[0].checked) {
 				let attempt = 0,
-					connected = false;
+				connected = false;
 				while (!connected && attempt++ < 5) {
 					if ((await this._isConnectedToSSID(ssid)).connected) {
 						this._showNotification(_("Connected to Wi-Fi network: ") + ssid);
 						this._indicator.visible = true;
 						return;
 					}
+					const wifiEnabled = await this._run(["nmcli", "radio", "wifi"])
+					if (wifiEnabled.stdout.includes("disabled")) {
+						await this._run(["nmcli", "radio", "wifi", "on"])
+					}
 					await this._run(["nmcli", "device", "wifi", "rescan"]);
-					const result = await this._run([
-						"nmcli",
-						"device",
-						"wifi",
-						"connect",
-						ssid,
-					]);
-					connected = !!result?.success;
+					const wifiDevices = await this._run(["nmcli", "device", "wifi", "list"])
+					if (wifiDevices.stdout.includes(ssid)) {
+						const result = await this._run([
+							"nmcli",
+							"device",
+							"wifi",
+							"connect",
+							ssid,
+						]);
+						connected = !!result?.success;
+					}
 					if (!connected) await this._wait(5);
 				}
 				if (connected) {
