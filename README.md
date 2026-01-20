@@ -2,6 +2,9 @@
 
 Toggle your Android phone's hotspot from the GNOME Shell Quick Settings menu!
 
+<img width="421" height="395" alt="Screenshot From 2025-08-11 23-28-46" src="https://github.com/user-attachments/assets/9337eb54-fa18-4bec-b752-9d81629a6a47" />
+
+
 > Status: Proof-of-concept. If you have issues, open a GitHub issue and I'll try and get on it!
 
 ## Requirements
