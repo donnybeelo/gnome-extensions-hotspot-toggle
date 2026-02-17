@@ -196,7 +196,10 @@ const HotspotToggle = GObject.registerClass(
 			try {
 				// Check if Bluetooth is enabled, and enable it if not
 				const bluetoothStatus = await this._run(["bluetoothctl", "show"]);
-				if (bluetoothStatus.stdout && !bluetoothStatus.stdout.includes("Powered: yes")) {
+				if (
+					bluetoothStatus.stdout &&
+					!bluetoothStatus.stdout.includes("Powered: yes")
+				) {
 					wasBluetoothDisabled = true;
 					await this._run(["rfkill", "unblock", "bluetooth"]);
 					await this._wait(1); // Wait for Bluetooth to fully power on
@@ -342,9 +345,9 @@ const HotspotToggle = GObject.registerClass(
 						this._indicator.visible = true;
 						return;
 					}
-					const wifiEnabled = await this._run(["nmcli", "radio", "wifi"])
+					const wifiEnabled = await this._run(["nmcli", "radio", "wifi"]);
 					if (wifiEnabled.stdout.includes("disabled")) {
-						await this._run(["nmcli", "radio", "wifi", "on"])
+						await this._run(["nmcli", "radio", "wifi", "on"]);
 					}
 					await this._run(["nmcli", "device", "wifi", "rescan"]);
 					const wifiDevices = await this._run(["nmcli", "device", "wifi", "list"])
@@ -376,7 +379,13 @@ const HotspotToggle = GObject.registerClass(
 					this._indicator.visible = false;
 					return;
 				}
-				await this._run(["nmcli", "device", "disconnect", "wlo1"]);
+				const { stdout } = await this._run(["nmcli", "device"]);
+				const wifiLine = stdout
+					.split("\n")
+					.find((line) => line.includes("wifi"));
+				const wifiDevice = wifiLine ? wifiLine.trim().split(/\s+/)[0] : "wlo1";
+
+				await this._run(["nmcli", "device", "disconnect", wifiDevice]);
 				this._showNotification(_("Disconnected from Wi-Fi network: ") + ssid);
 				this._indicator.visible = false;
 				await this._run(["nmcli", "device", "wifi", "rescan"]);
@@ -384,7 +393,7 @@ const HotspotToggle = GObject.registerClass(
 					"nmcli",
 					"device",
 					"set",
-					"wlo1",
+					wifiDevice,
 					"autoconnect",
 					"on",
 				]);
