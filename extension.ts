@@ -330,6 +330,7 @@ const HotspotToggle = GObject.registerClass(
 				await call("Connect");
 			} else {
 				await call("Connect");
+				await this._wait(2); // Wait for connect to complete
 				await call("Disconnect");
 			}
 		}
