@@ -15,7 +15,8 @@ schemas/gschemas.compiled: schemas/org.gnome.shell.extensions.$(NAME).gschema.xm
 	glib-compile-schemas schemas
 
 $(NAME).zip: dist/extension.js dist/prefs.js schemas/gschemas.compiled
-	@cp -r schemas dist/
+	@mkdir -p dist/schemas
+	@cp schemas/org.gnome.shell.extensions.$(NAME).gschema.xml dist/schemas
 	@cp -r locale dist/
 	@cp metadata.json dist/
 	@(cd dist && zip ../$(NAME).zip -9r .)
@@ -26,6 +27,7 @@ install: $(NAME).zip
 	@touch ~/.local/share/gnome-shell/extensions/$(NAME)@$(DOMAIN)
 	@rm -rf ~/.local/share/gnome-shell/extensions/$(NAME)@$(DOMAIN)
 	@mv dist ~/.local/share/gnome-shell/extensions/$(NAME)@$(DOMAIN)
+	@cp schemas/gschemas.compiled ~/.local/share/gnome-shell/extensions/$(NAME)@$(DOMAIN)/schemas/
 
 clean:
 	@rm -rf dist node_modules $(NAME).zip
