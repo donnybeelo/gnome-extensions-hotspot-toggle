@@ -214,13 +214,26 @@ const HotspotToggle = GObject.registerClass(
 						),
 					);
 				}
+
+				// Establish proxy to Bluetooth and find out whether
+				const btDevice = await this._bluezDeviceProxy(devicePath);
+				const connectedProperty = btDevice
+					.get_cached_property("Connected")
+					?.unpack();
+				const connected = connectedProperty ? true : false;
+
 				// Connect to the device if not already connected
-				await this._bluezConnectThenDisconnectDevice(devicePath);
+				await this._bluezSetConnectedState(btDevice, !connected);
+				if (connected) await this._bluezSetConnectedState(btDevice, true);
+				await this._handleWiFi();
+				if (!connected) {
+					await this._wait(10);
+					await this._bluezSetConnectedState(btDevice, connected); // Revert Bluetooth connection state
+				}
+
 				if (wasBluetoothDisabled) {
 					await this._run(["rfkill", "block", "bluetooth"]);
 				}
-
-				await this._handleWiFi();
 				this._running = false;
 			} catch (e: unknown) {
 				const message = e instanceof Error ? e.message : String(e);
@@ -228,6 +241,27 @@ const HotspotToggle = GObject.registerClass(
 				this._setIndicatorVisibility();
 				this._running = false;
 			}
+		}
+
+		async _bluezDeviceProxy(devicePath: string): Promise<Gio.DBusProxy> {
+			return await new Promise((resolve, reject) => {
+				Gio.DBusProxy.new_for_bus(
+					Gio.BusType.SYSTEM,
+					Gio.DBusProxyFlags.NONE,
+					null,
+					"org.bluez",
+					devicePath,
+					"org.bluez.Device1",
+					null,
+					(src, res) => {
+						try {
+							resolve(Gio.DBusProxy.new_for_bus_finish(res));
+						} catch (e) {
+							reject(e);
+						}
+					},
+				);
+			});
 		}
 
 		async _findBluezDevicePath(btAddress: string): Promise<string | null> {
@@ -285,61 +319,35 @@ const HotspotToggle = GObject.registerClass(
 			return null;
 		}
 
-		async _bluezConnectThenDisconnectDevice(devicePath: string) {
-			const device: Gio.DBusProxy = await new Promise((resolve, reject) => {
-				Gio.DBusProxy.new_for_bus(
-					Gio.BusType.SYSTEM,
-					Gio.DBusProxyFlags.NONE,
+		async _bluezSetConnectedState(
+			device: Gio.DBusProxy,
+			connect: boolean = true,
+		) {
+			const method = connect ? "Connect" : "Disconnect";
+			new Promise((resolve, reject) => {
+				device.call(
+					method,
 					null,
-					"org.bluez",
-					devicePath,
-					"org.bluez.Device1",
+					Gio.DBusCallFlags.NONE,
+					-1,
 					null,
-					(src, res) => {
+					(proxy, res) => {
 						try {
-							resolve(Gio.DBusProxy.new_for_bus_finish(res));
+							proxy?.call_finish(res);
+							resolve(undefined);
 						} catch (e) {
 							reject(e);
 						}
 					},
 				);
 			});
-
-			const call = (method: string) =>
-				new Promise((resolve, reject) => {
-					device.call(
-						method,
-						null,
-						Gio.DBusCallFlags.NONE,
-						-1,
-						null,
-						(proxy, res) => {
-							try {
-								proxy?.call_finish(res);
-								resolve(undefined);
-							} catch (e) {
-								reject(e);
-							}
-						},
-					);
-				});
-			const connected = device.get_cached_property("Connected")?.unpack();
-			if (connected) {
-				await call("Disconnect");
-				await this._wait(2); // Wait for disconnect to complete
-				await call("Connect");
-			} else {
-				await call("Connect");
-				await this._wait(2); // Wait for connect to complete
-				await call("Disconnect");
-			}
 		}
 
 		async _handleWiFi() {
 			const ssid = this._settings.get_string("wifi-ssid");
 			if (this.quickSettingsItems[0].checked) {
 				let attempt = 0,
-				connected = false;
+					connected = false;
 				while (!connected && attempt++ < 5) {
 					if ((await this._isConnectedToSSID(ssid)).connected) {
 						this._showNotification(_("Connected to Wi-Fi network: ") + ssid);
@@ -351,7 +359,12 @@ const HotspotToggle = GObject.registerClass(
 						await this._run(["nmcli", "radio", "wifi", "on"]);
 					}
 					await this._run(["nmcli", "device", "wifi", "rescan"]);
-					const wifiDevices = await this._run(["nmcli", "device", "wifi", "list"])
+					const wifiDevices = await this._run([
+						"nmcli",
+						"device",
+						"wifi",
+						"list",
+					]);
 					if (wifiDevices.stdout.includes(ssid)) {
 						const result = await this._run([
 							"nmcli",
