@@ -25,6 +25,8 @@ const HotspotToggle = GObject.registerClass(
 		_timerid: number;
 		_indicator: St.Icon;
 		_running: boolean;
+		_pendingBtDevice: Gio.DBusProxy | null;
+		_wasBluetoothDisabled: boolean;
 		constructor(settings: Gio.Settings) {
 			super();
 
@@ -35,6 +37,8 @@ const HotspotToggle = GObject.registerClass(
 			this._indicator.icon_name = "network-wireless-hotspot-symbolic";
 			this._timerid = 0;
 			this._running = false;
+			this._pendingBtDevice = null;
+			this._wasBluetoothDisabled = false;
 
 			const toggle: QuickSettings.QuickToggle = new QuickSettings.QuickToggle({
 				title: _("Phone Hotspot"),
@@ -169,15 +173,43 @@ const HotspotToggle = GObject.registerClass(
 
 		async _toggleHotspot() {
 			if (this._running) {
-				this.quickSettingsItems[0].checked =
-					!this.quickSettingsItems[0].checked;
-				return;
+				const device = this._pendingBtDevice;
+				if (!device || device.get_cached_property("Connected")?.unpack()) {
+					this.quickSettingsItems[0].checked =
+						!this.quickSettingsItems[0].checked;
+					return;
+				}
+				if (this._timerid) {
+					GLib.Source.remove(this._timerid);
+					this._timerid = 0;
+				}
+				this._pendingBtDevice = null;
+				this._running = false;
 			}
 
 			const hotspotOn = await this._setIndicatorVisibility(false);
 			const toggleOn = this.quickSettingsItems[0].checked;
-			if ((toggleOn && hotspotOn) || (!toggleOn && !hotspotOn)) {
+			if (toggleOn && hotspotOn) {
+				const ssid = this._settings.get_string("wifi-ssid");
+				const result = await this._run([
+					"env",
+					"LC_ALL=C",
+					"nmcli",
+					"device",
+					"wifi",
+					"connect",
+					ssid,
+				]);
+				if (
+					!/could not be found|No network with SSID/.test(result.stderr)
+				) {
+					await this._handleWiFi();
+					await this._restoreBluetooth();
+					return;
+				}
+			} else if (!toggleOn && !hotspotOn) {
 				await this._handleWiFi();
+				await this._restoreBluetooth();
 				return;
 			}
 
@@ -190,9 +222,9 @@ const HotspotToggle = GObject.registerClass(
 					),
 				);
 				this._setIndicatorVisibility();
+				this._running = false;
 				return;
 			}
-			let wasBluetoothDisabled = false;
 			try {
 				// Check if Bluetooth is enabled, and enable it if not
 				const bluetoothStatus = await this._run(["bluetoothctl", "show"]);
@@ -200,7 +232,7 @@ const HotspotToggle = GObject.registerClass(
 					bluetoothStatus.stdout &&
 					!bluetoothStatus.stdout.includes("Powered: yes")
 				) {
-					wasBluetoothDisabled = true;
+					this._wasBluetoothDisabled = true;
 					await this._run(["rfkill", "unblock", "bluetooth"]);
 					await this._wait(1); // Wait for Bluetooth to fully power on
 				}
@@ -227,20 +259,27 @@ const HotspotToggle = GObject.registerClass(
 				if (connected) await this._bluezSetConnectedState(btDevice, true);
 				await this._handleWiFi();
 				if (!connected) {
+					this._pendingBtDevice = btDevice;
 					await this._wait(10);
+					this._pendingBtDevice = null;
 					await this._bluezSetConnectedState(btDevice, connected); // Revert Bluetooth connection state
 				}
 
-				if (wasBluetoothDisabled) {
-					await this._run(["rfkill", "block", "bluetooth"]);
-				}
+				await this._restoreBluetooth();
 				this._running = false;
 			} catch (e: unknown) {
 				const message = e instanceof Error ? e.message : String(e);
 				this._showNotification(_(`Error: ${message}`));
 				this._setIndicatorVisibility();
+				await this._restoreBluetooth();
 				this._running = false;
 			}
+		}
+
+		async _restoreBluetooth() {
+			if (!this._wasBluetoothDisabled) return;
+			this._wasBluetoothDisabled = false;
+			await this._run(["rfkill", "block", "bluetooth"]);
 		}
 
 		async _bluezDeviceProxy(devicePath: string): Promise<Gio.DBusProxy> {
@@ -323,11 +362,13 @@ const HotspotToggle = GObject.registerClass(
 			device: Gio.DBusProxy,
 			connect: boolean = true,
 		) {
-			const method = connect ? "Connect" : "Disconnect";
-			new Promise((resolve, reject) => {
+			const method = connect ? "ConnectProfile" : "Disconnect";
+			// NAP
+			const params = connect ? new GLib.Variant("(s)", ["0x1116"]) : null;
+			return new Promise((resolve, reject) => {
 				device.call(
 					method,
-					null,
+					params,
 					Gio.DBusCallFlags.NONE,
 					-1,
 					null,
@@ -336,7 +377,8 @@ const HotspotToggle = GObject.registerClass(
 							proxy?.call_finish(res);
 							resolve(undefined);
 						} catch (e) {
-							reject(e);
+							if (connect) resolve(undefined);
+							else reject(e);
 						}
 					},
 				);
