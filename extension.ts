@@ -14,6 +14,28 @@ interface RunResult {
 	stderr: string;
 }
 
+const GATT_SERVICE_UUID = "9ee751d0-7f57-48d0-86b9-8b5bbc12c48b";
+const GATT_CHAR_UUID = "4abcc130-223c-4c15-b29f-8f2b347483b0";
+const GATT_ROOT = "/net/donnybeelo/hotspot";
+const GATT_SERVICE_PATH = `${GATT_ROOT}/service0`;
+const GATT_CHAR_PATH = `${GATT_SERVICE_PATH}/char0`;
+const GATT_ADV_PATH = `${GATT_ROOT}/advert0`;
+
+const OBJECT_MANAGER_XML = `<node><interface name="org.freedesktop.DBus.ObjectManager">
+	<method name="GetManagedObjects"><arg type="a{oa{sa{sv}}}" direction="out"/></method>
+</interface></node>`;
+const GATT_CHAR_XML = `<node><interface name="org.bluez.GattCharacteristic1">
+	<method name="ReadValue">
+		<arg type="a{sv}" direction="in"/>
+		<arg type="ay" direction="out"/>
+	</method>
+</interface></node>`;
+const GATT_ADV_XML = `<node><interface name="org.bluez.LEAdvertisement1">
+	<method name="Release"/>
+	<property name="Type" type="s" access="read"/>
+	<property name="ServiceUUIDs" type="as" access="read"/>
+</interface></node>`;
+
 const HotspotToggle = GObject.registerClass(
 	class HotspotToggle extends QuickSettings.SystemIndicator {
 		menu: any;
@@ -27,6 +49,9 @@ const HotspotToggle = GObject.registerClass(
 		_running: boolean;
 		_pendingBtDevice: Gio.DBusProxy | null;
 		_wasBluetoothDisabled: boolean;
+		_intent: number;
+		_gattExports: Gio.DBusExportedObject[];
+		_gattAdapter: string;
 		constructor(settings: Gio.Settings) {
 			super();
 
@@ -39,6 +64,9 @@ const HotspotToggle = GObject.registerClass(
 			this._running = false;
 			this._pendingBtDevice = null;
 			this._wasBluetoothDisabled = false;
+			this._intent = 0;
+			this._gattExports = [];
+			this._gattAdapter = "";
 
 			const toggle: QuickSettings.QuickToggle = new QuickSettings.QuickToggle({
 				title: _("Phone Hotspot"),
@@ -189,25 +217,7 @@ const HotspotToggle = GObject.registerClass(
 
 			const hotspotOn = await this._setIndicatorVisibility(false);
 			const toggleOn = this.quickSettingsItems[0].checked;
-			if (toggleOn && hotspotOn) {
-				const ssid = this._settings.get_string("wifi-ssid");
-				const result = await this._run([
-					"env",
-					"LC_ALL=C",
-					"nmcli",
-					"device",
-					"wifi",
-					"connect",
-					ssid,
-				]);
-				if (
-					!/could not be found|No network with SSID/.test(result.stderr)
-				) {
-					await this._handleWiFi();
-					await this._restoreBluetooth();
-					return;
-				}
-			} else if (!toggleOn && !hotspotOn) {
+			if (!toggleOn && !hotspotOn) {
 				await this._handleWiFi();
 				await this._restoreBluetooth();
 				return;
@@ -247,6 +257,11 @@ const HotspotToggle = GObject.registerClass(
 					);
 				}
 
+				await this._registerIntent(
+					toggleOn ? 1 : 0,
+					devicePath.substring(0, devicePath.lastIndexOf("/")),
+				);
+
 				// Establish proxy to Bluetooth and find out whether
 				const btDevice = await this._bluezDeviceProxy(devicePath);
 				const connectedProperty = btDevice
@@ -256,24 +271,127 @@ const HotspotToggle = GObject.registerClass(
 
 				// Connect to the device if not already connected
 				await this._bluezSetConnectedState(btDevice, !connected);
-				if (connected) await this._bluezSetConnectedState(btDevice, true);
+				if (connected) {
+					await this._wait(2);
+					await this._bluezSetConnectedState(btDevice, true);
+				}
 				await this._handleWiFi();
+				this._pendingBtDevice = btDevice;
+				await this._wait(10);
+				this._pendingBtDevice = null;
 				if (!connected) {
-					this._pendingBtDevice = btDevice;
-					await this._wait(10);
-					this._pendingBtDevice = null;
 					await this._bluezSetConnectedState(btDevice, connected); // Revert Bluetooth connection state
 				}
 
+				await this._unregisterIntent();
 				await this._restoreBluetooth();
 				this._running = false;
 			} catch (e: unknown) {
 				const message = e instanceof Error ? e.message : String(e);
 				this._showNotification(_(`Error: ${message}`));
 				this._setIndicatorVisibility();
+				await this._unregisterIntent();
 				await this._restoreBluetooth();
 				this._running = false;
 			}
+		}
+
+		async _bluezAdapterCall(
+			iface: string,
+			method: string,
+			params: GLib.Variant,
+		) {
+			return new Promise((resolve, reject) => {
+				Gio.DBus.system.call(
+					"org.bluez",
+					this._gattAdapter,
+					iface,
+					method,
+					params,
+					null,
+					Gio.DBusCallFlags.NONE,
+					-1,
+					null,
+					(conn, res) => {
+						try {
+							resolve(conn?.call_finish(res));
+						} catch (e) {
+							reject(e);
+						}
+					},
+				);
+			});
+		}
+
+		// Publishes the on/off intent as a GATT characteristic the phone can read
+		async _registerIntent(intent: number, adapterPath: string) {
+			this._intent = intent;
+			if (this._gattExports.length) return;
+			this._gattAdapter = adapterPath;
+
+			const exportObject = (path: string, xml: string, impl: object) => {
+				const exported = Gio.DBusExportedObject.wrapJSObject(xml, impl);
+				exported.export(Gio.DBus.system, path);
+				return exported;
+			};
+
+			this._gattExports = [
+				exportObject(GATT_ROOT, OBJECT_MANAGER_XML, {
+					GetManagedObjects: () => ({
+						[GATT_SERVICE_PATH]: {
+							"org.bluez.GattService1": {
+								UUID: new GLib.Variant("s", GATT_SERVICE_UUID),
+								Primary: new GLib.Variant("b", true),
+							},
+						},
+						[GATT_CHAR_PATH]: {
+							"org.bluez.GattCharacteristic1": {
+								UUID: new GLib.Variant("s", GATT_CHAR_UUID),
+								Service: new GLib.Variant("o", GATT_SERVICE_PATH),
+								Flags: new GLib.Variant("as", ["read"]),
+							},
+						},
+					}),
+				}),
+				exportObject(GATT_CHAR_PATH, GATT_CHAR_XML, {
+					ReadValue: () => new Uint8Array([this._intent]),
+				}),
+				exportObject(GATT_ADV_PATH, GATT_ADV_XML, {
+					Type: "peripheral",
+					ServiceUUIDs: [GATT_SERVICE_UUID],
+					Release: () => {},
+				}),
+			];
+
+			await this._bluezAdapterCall(
+				"org.bluez.GattManager1",
+				"RegisterApplication",
+				new GLib.Variant("(oa{sv})", [GATT_ROOT, {}]),
+			);
+			await this._bluezAdapterCall(
+				"org.bluez.LEAdvertisingManager1",
+				"RegisterAdvertisement",
+				new GLib.Variant("(oa{sv})", [GATT_ADV_PATH, {}]),
+			);
+		}
+
+		async _unregisterIntent() {
+			if (!this._gattExports.length) return;
+			const objects = this._gattExports;
+			this._gattExports = [];
+
+			await this._bluezAdapterCall(
+				"org.bluez.LEAdvertisingManager1",
+				"UnregisterAdvertisement",
+				new GLib.Variant("(o)", [GATT_ADV_PATH]),
+			).catch(() => {});
+			await this._bluezAdapterCall(
+				"org.bluez.GattManager1",
+				"UnregisterApplication",
+				new GLib.Variant("(o)", [GATT_ROOT]),
+			).catch(() => {});
+
+			objects.forEach((exported) => exported.unexport());
 		}
 
 		async _restoreBluetooth() {
@@ -463,6 +581,7 @@ const HotspotToggle = GObject.registerClass(
 				GLib.Source.remove(this._timerid);
 				this._timerid = 0;
 			}
+			this._unregisterIntent();
 			this._indicator.destroy();
 			super.destroy();
 		}
