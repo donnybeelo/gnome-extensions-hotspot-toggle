@@ -33,10 +33,11 @@ clean:
 	@rm -rf dist node_modules $(NAME).zip
 
 update-latest:
-	git tag -d latest
-	git push origin :latest
+	git tag -d latest || true
+	git push origin :latest || true
 	git tag -f latest
 	git push origin latest
 	make pack
-	open .
-	open "https://extensions.gnome.org/upload/"
+	xdg-open . &
+	sleep 0.5
+	xdg-open "https://extensions.gnome.org/upload/" &
